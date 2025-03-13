@@ -1,8 +1,8 @@
-import express from "express";
-import mongoose from "mongoose";
-import dotenv from "dotenv";
-import reportRoutes from "./routes/reportRoutes.js";
-
+const express = require("express");
+const mongoose = require("mongoose");
+const dotenv = require("dotenv");
+const router = require("./routes/reportRoutes");
+const { triggerReport, getAggregatedReport, getReport } = require("./controllers/reportController");
 dotenv.config();
 const app = express();
 app.use(express.json());
@@ -14,7 +14,9 @@ mongoose.connect(process.env.MONGO_URI, {
 .then(() => console.log("MongoDB Connected"))
 .catch(err => console.error("MongoDB Connection Error:", err));
 
-app.use("/api", reportRoutes);
+app.use("/api", router);
+app.get("/", (req,res) => res.send("hello world"));
+app.post("/abcd", triggerReport);
 
 const PORT = process.env.PORT;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));

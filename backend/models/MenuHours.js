@@ -1,4 +1,5 @@
-import mongoose from "mongoose";
+// models/MenuHours.js
+const mongoose = require("mongoose");
 
 const menuHoursSchema = new mongoose.Schema({
     store_id: String,
@@ -7,7 +8,8 @@ const menuHoursSchema = new mongoose.Schema({
     end_time_local: String, // "22:00"
 });
 
-export default mongoose.model("MenuHours", menuHoursSchema);
+module.exports= mongoose.model("MenuHours", menuHoursSchema);
+
 
 
 

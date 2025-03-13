@@ -1,10 +1,12 @@
-import mongoose from "mongoose";
+// models/Timezone.js
 
+const mongoose=require("mongoose");
 const timezoneSchema = new mongoose.Schema({
     store_id: String,
     timezone_str: String,
-});
+}); // Explicitly set collection name
 
-export default mongoose.model("Timezone", timezoneSchema);
+module.exports= mongoose.model("Timezone", timezoneSchema);
+
 
 

@@ -25,17 +25,16 @@
 // export default Report;
 
 // //export const Report = mongoose.model("Report", ReportSchema);
-
-import mongoose from "mongoose";
+const mongoose = require("mongoose");
 
 const reportSchema = new mongoose.Schema({
     report_id: { type: String, required: true, unique: true },
     data: { type: Array, required: true },
-    file_path: { type: String, required: false },  // ✅ Add this field
+    file_path: { type: String, required: false },  // Add this field
     status: { type: String, enum: ["Running", "Complete"], default: "Running" },
     created_at: { type: Date, default: Date.now }
 });
 
-export default mongoose.model("Report", reportSchema);
+module.exports = mongoose.model("Report", reportSchema);
 
 
