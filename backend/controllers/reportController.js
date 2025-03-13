@@ -33,11 +33,18 @@ const generateReportData = async (report_id) => {
         console.log(`Using max timestamp as current time: ${maxTimestamp.format()}`);
 
         // Define fixed reporting intervals relative to this max timestamp
+        // const timeRanges = {
+        //     lastHour: maxTimestamp.clone().subtract(1, "hours"),
+        //     lastDay: maxTimestamp.clone().subtract(24, "hours"),
+        //     lastWeek: maxTimestamp.clone().subtract(7, "days"),
+        // };
         const timeRanges = {
             lastHour: maxTimestamp.clone().subtract(1, "hours"),
             lastDay: maxTimestamp.clone().subtract(24, "hours"),
             lastWeek: maxTimestamp.clone().subtract(7, "days"),
+            lastYear: maxTimestamp.clone().subtract(1, "year"), // Added lastYear
         };
+        
 
         console.log("Fetching store IDs from database...");
         const stores = await StoreStatus.aggregate([{ $group: { _id: "$store_id" } },{$limit:2}]);
@@ -61,9 +68,15 @@ const generateReportData = async (report_id) => {
         });
 
         console.log("Fetching all status updates...");
-        const statusesData = await StoreStatus.find({
-            timestamp_utc: { $gte: timeRanges.lastWeek.toDate() }
-        }).sort({ store_id: 1, timestamp_utc: 1 }).lean();
+        // const statusesData = await StoreStatus.find({
+        //     timestamp_utc: { $gte: timeRanges.lastWeek.toDate() }
+        // }).sort({ store_id: 1, timestamp_utc: 1 }).lean();
+        const statusesData = await StoreStatus.find({ 
+            timestamp_utc: { $gte: timeRanges.lastYear.toDate() } 
+        })
+        .sort({ store_id: 1, timestamp_utc: 1 })
+        .lean();
+        
 
         // Map store_id → array of status records
         const storeStatusMap = new Map();
@@ -98,8 +111,8 @@ const generateReportData = async (report_id) => {
                 continue;
             }
 
-            let uptime = { lastHour: 0, lastDay: 0, lastWeek: 0 };
-            let downtime = { lastHour: 0, lastDay: 0, lastWeek: 0 };
+            let uptime = { lastHour: 0, lastDay: 0, lastWeek: 0,lastYear: 0 };
+            let downtime = { lastHour: 0, lastDay: 0, lastWeek: 0,lastYear: 0};
 
             let prevTimestamp = null;
             let prevStatus = null;
@@ -151,9 +164,11 @@ const generateReportData = async (report_id) => {
                 uptime_last_hour: Math.max(uptime.lastHour, 1),
                 uptime_last_day: (Math.max(uptime.lastDay, 1) / 60).toFixed(2),
                 uptime_last_week: (Math.max(uptime.lastWeek, 1) / 60).toFixed(2),
+                uptime_last_year: (Math.max(uptime.lastYear, 1) / 1440).toFixed(2), // Convert minutes to days
                 downtime_last_hour: Math.max(downtime.lastHour, 1),
                 downtime_last_day: (Math.max(downtime.lastDay, 1) / 60).toFixed(2),
                 downtime_last_week: (Math.max(downtime.lastWeek, 1) / 60).toFixed(2),
+                downtime_last_year: (Math.max(downtime.lastYear, 1) / 1440).toFixed(2), // Convert minutes to days
             });
         }
 
