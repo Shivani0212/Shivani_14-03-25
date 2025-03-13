@@ -14,30 +14,23 @@ This project provides backend APIs to monitor the uptime and downtime of restaur
 
 The system utilizes three CSV data sources:
 
-1. **Store Status** (\`store_id, timestamp_utc, status\`)
-   - Captures whether a store is \`active\` or \`inactive\` at a given UTC timestamp.
+1. **Store Status** (`store_id, timestamp_utc, status`)
+   - Captures whether a store is `active` or `inactive` at a given UTC timestamp.
 
-2. **Business Hours** (\`store_id, dayOfWeek, start_time_local, end_time_local\`)
+2. **Business Hours** (`store_id, dayOfWeek, start_time_local, end_time_local`)
    - Specifies store opening and closing hours in local time.
    - If missing, assume the store operates 24/7.
 
-3. **Timezones** (\`store_id, timezone_str\`)
+3. **Timezones** (`store_id, timezone_str`)
    - Provides the store's timezone.
-   - If missing, assume \`America/Chicago\`.
-
-## System Requirements
-
-- Data updates dynamically every hour.
-- CSV data is stored in MongoDB for real-time processing.
-- Uptime and downtime calculations consider only business hours.
-- Missing observations are interpolated to estimate uptime/downtime accurately.
+   - If missing, assume `America/Chicago`.
 
 ## API Endpoints
 
 ### 1. Trigger Report Generation
 
 **Endpoint:**  
-\`POST /trigger_report\`
+`POST /trigger_report`
 
 **Description:**  
 Initiates report generation.
@@ -46,32 +39,31 @@ Initiates report generation.
 _No input required._
 
 **Response:**  
-\`\`\`json
+`json
 {
   "report_id": "random_generated_string"
-}
-\`\`\`
+}`
 
 ---
 
 ### 2. Get Report Status or Download CSV
 
 **Endpoint:**  
-\`GET /get_report?report_id=<report_id>\`
+`GET /get_report?report_id=<report_id>`
 
 **Description:**  
 Retrieves the status of report generation or the final CSV file.
 
 **Request:**  
-- \`report_id\` (Query Parameter) - The ID received from \`/trigger_report\`.
+- `report_id` (Query Parameter) - The ID received from `/trigger_report`.
 
 **Response:**  
 - If report generation is still in progress:
-  \`\`\`json
+  `json
   {
     "status": "Running"
   }
-  \`\`\`
+  `
 - If report generation is complete, returns the CSV file.
 
 ---
@@ -86,18 +78,13 @@ The generated report includes:
 ## Installation
 
 1. Clone the repository:
-   \`\`\`
-   git clone https://github.com/your-username/store-monitoring-system.git
-   cd store-monitoring-system
-   \`\`\`
-2. Install dependencies:
-   \`\`\`
-   npm install
-   \`\`\`
-3. Set up MongoDB and load CSV data.
+   `git clone https://github.com/your-username/store-monitoring-system.git`
+2. change directory
+   `cd store-monitoring-system/backend`
+3. Install dependencies:
+   `npm install`
+4. Set up MongoDB and load CSV data.
 
-4. Start the server:
-   \`\`\`
-   npm run server
-   \`\`\`
+5. Start the server:
+   `npm run dev`
 

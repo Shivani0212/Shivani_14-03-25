@@ -1,19 +1,12 @@
-const mongoose = require("mongoose");
 const moment = require("moment-timezone");
 const { v4: uuidv4 } = require("uuid");
 const fs = require("fs");
 const path = require("path");
-const csvParser = require("csv-parser"); // For reading CSV files
 const StoreStatus = require("../models/StoreStatus");
-const Timezone = require("../models/Timezone");
+const Timezone = require("../models/timezone");
 const MenuHours = require("../models/MenuHours");
 const Report = require("../models/Report");
 const { parseAsync } = require("json2csv");
- // For CSV conversion
-const reportsDir = "./reports";
-if (!fs.existsSync(reportsDir)) {
-    fs.mkdirSync(reportsDir, { recursive: true });
-}
 
 
 const generateReportData = async (report_id) => {
@@ -32,22 +25,15 @@ const generateReportData = async (report_id) => {
 
         console.log(`Using max timestamp as current time: ${maxTimestamp.format()}`);
 
-        // Define fixed reporting intervals relative to this max timestamp
-        // const timeRanges = {
-        //     lastHour: maxTimestamp.clone().subtract(1, "hours"),
-        //     lastDay: maxTimestamp.clone().subtract(24, "hours"),
-        //     lastWeek: maxTimestamp.clone().subtract(7, "days"),
-        // };
         const timeRanges = {
             lastHour: maxTimestamp.clone().subtract(1, "hours"),
             lastDay: maxTimestamp.clone().subtract(24, "hours"),
             lastWeek: maxTimestamp.clone().subtract(7, "days"),
-            lastYear: maxTimestamp.clone().subtract(1, "year"), // Added lastYear
         };
         
 
-        console.log("Fetching store IDs from database...");
-        const stores = await StoreStatus.aggregate([{ $group: { _id: "$store_id" } },{$limit:2}]);
+        console.log("Fetching distinct store IDs from database...");
+        const stores = await StoreStatus.aggregate([{ $group: { _id: "$store_id" } },{$limit:1}]);
 
         // Fetch all timezone data
         const timezoneData = await Timezone.find().lean();
@@ -61,32 +47,9 @@ const generateReportData = async (report_id) => {
                 businessHoursMap.set(mh.store_id, []);
             }
             businessHoursMap.get(mh.store_id).push({
-                day_of_week: parseInt(mh.dayOfWeek, 10), // Fix: Convert `dayOfWeek` to an integer
+                day_of_week: mh.day_of_week,
                 start_time_local: mh.start_time_local,
                 end_time_local: mh.end_time_local
-            });
-        });
-
-        console.log("Fetching all status updates...");
-        // const statusesData = await StoreStatus.find({
-        //     timestamp_utc: { $gte: timeRanges.lastWeek.toDate() }
-        // }).sort({ store_id: 1, timestamp_utc: 1 }).lean();
-        const statusesData = await StoreStatus.find({ 
-            timestamp_utc: { $gte: timeRanges.lastYear.toDate() } 
-        })
-        .sort({ store_id: 1, timestamp_utc: 1 })
-        .lean();
-        
-
-        // Map store_id → array of status records
-        const storeStatusMap = new Map();
-        statusesData.forEach(status => {
-            if (!storeStatusMap.has(status.store_id)) {
-                storeStatusMap.set(status.store_id, []);
-            }
-            storeStatusMap.get(status.store_id).push({
-                status: status.status,
-                timestamp_utc: moment.utc(new Date(status.timestamp_utc.trim())) // Fix: Ensure correct parsing
             });
         });
 
@@ -99,82 +62,80 @@ const generateReportData = async (report_id) => {
 
             // Get store timezone (default to America/Chicago)
             const timezone = timezoneMap.get(store_id) || "America/Chicago";
+            console.log(`Timezone : ${timezone}`);
 
             // Get store business hours (default to 24/7)
-            let storeBusinessHours = businessHoursMap.get(store_id) || getDefaultBusinessHours();
+            const businessHours = businessHoursMap.get(store_id) || getDefaultBusinessHours();
 
-            // Get store statuses from our pre-fetched map
-            const statuses = storeStatusMap.get(store_id) || [];
+            // Fetch all entries for the store
+            const statuses = await StoreStatus.find({ store_id: store_id }).lean();
+            
+            // Convert timestamps to Date & sort
+            statuses.forEach(entry => {
+                entry.timestamp_utc = moment.utc(entry.timestamp_utc.replace(" UTC", "Z"));
+            });
+            statuses.sort((a, b) => a.timestamp_utc - b.timestamp_utc);
 
-            if (statuses.length === 0) {
-                console.warn(`No status records found for store ${store_id}. Skipping.`);
-                continue;
-            }
+            // Function to compute uptime/downtime
+            const computeUptimeDowntime = (filteredStatuses, rangeName) => {
+                let uptime = 0, downtime = 0;
+                let prevTimestamp = null;
+                let prevStatus = null;
 
-            let uptime = { lastHour: 0, lastDay: 0, lastWeek: 0,lastYear: 0 };
-            let downtime = { lastHour: 0, lastDay: 0, lastWeek: 0,lastYear: 0};
+                for (const status of filteredStatuses) {
+                    const timestamp = status.timestamp_utc.clone().tz(timezone);
 
-            let prevTimestamp = null;
-            let prevStatus = null;
+                    // TODO - Ignore if outside business hours
+                    // if (!isWithinBusinessHours(timestamp,businessHours)) continue; 
 
-            for (let i = 0; i < statuses.length; i++) {
-                let status = statuses[i];
-                let timestamp = status.timestamp_utc.tz(timezone);
+                    if (prevTimestamp) {
+                        const diffMinutes = timestamp.diff(prevTimestamp, "minutes");
 
-                if (!prevTimestamp) {
+                        if (prevStatus === "active") uptime += diffMinutes;
+                        else downtime += diffMinutes;
+                    }
+
                     prevTimestamp = timestamp;
                     prevStatus = status.status;
-                    continue;
                 }
 
-                let diffMinutes = timestamp.diff(prevTimestamp, "minutes");
-                const dayOfWeek = timestamp.isoWeekday() - 1; // Convert to 0=Monday, 6=Sunday
+                console.log(`Uptime for ${rangeName}: ${uptime} mins`);
+                console.log(`Downtime for ${rangeName}: ${downtime} mins`);
 
-                let menuHours = storeBusinessHours.filter(m => m.day_of_week === dayOfWeek);
-                if (menuHours.length === 0) {
-                    menuHours = [{ start_time_local: "00:00:00", end_time_local: "23:59:59" }];
-                }
+                return { uptime, downtime };
+            };
 
-                for (let hours of menuHours) {
-                    let startTime = moment.tz(
-                        timestamp.format("YYYY-MM-DD") + " " + hours.start_time_local,
-                        timezone
-                    );
-                    let endTime = moment.tz(
-                        timestamp.format("YYYY-MM-DD") + " " + hours.end_time_local,
-                        timezone
-                    );
-                    let isWithinOperatingHours = timestamp.isBetween(startTime, endTime, null, "[]");
 
-                    if (isWithinOperatingHours) {
-                        if (prevStatus === "active") {
-                            updateUptimeDowntime(uptime, timestamp, diffMinutes, timeRanges);
-                        } else {
-                            updateUptimeDowntime(downtime, timestamp, diffMinutes, timeRanges);
-                        }
-                    }
-                }
+            // Compute separately for each range
+            const uptimeDowntimeLastHour = computeUptimeDowntime(
+                statuses.filter(entry => entry.timestamp_utc >= timeRanges.lastHour),
+                "lastHour"
+            );
+            const uptimeDowntimeLastDay = computeUptimeDowntime(
+                statuses.filter(entry => entry.timestamp_utc >= timeRanges.lastDay),
+                "lastDay"
+            );
+            const uptimeDowntimeLastWeek = computeUptimeDowntime(
+                statuses.filter(entry => entry.timestamp_utc >= timeRanges.lastWeek),
+                "lastWeek"
+            );
 
-                prevTimestamp = timestamp;
-                prevStatus = status.status;
-            }
 
             reportData.push({
                 store_id,
-                uptime_last_hour: Math.max(uptime.lastHour, 1),
-                uptime_last_day: (Math.max(uptime.lastDay, 1) / 60).toFixed(2),
-                uptime_last_week: (Math.max(uptime.lastWeek, 1) / 60).toFixed(2),
-                uptime_last_year: (Math.max(uptime.lastYear, 1) / 1440).toFixed(2), // Convert minutes to days
-                downtime_last_hour: Math.max(downtime.lastHour, 1),
-                downtime_last_day: (Math.max(downtime.lastDay, 1) / 60).toFixed(2),
-                downtime_last_week: (Math.max(downtime.lastWeek, 1) / 60).toFixed(2),
-                downtime_last_year: (Math.max(downtime.lastYear, 1) / 1440).toFixed(2), // Convert minutes to days
+                uptime_last_hour: Math.max(uptimeDowntimeLastHour.uptime, 0),  
+                uptime_last_day: (Math.max(uptimeDowntimeLastDay.uptime, 1) / 60).toFixed(2),
+                uptime_last_week: (Math.max(uptimeDowntimeLastWeek.uptime, 1) / 60).toFixed(2),
+                downtime_last_hour: Math.max(uptimeDowntimeLastHour.downtime, 0),  
+                downtime_last_day: (Math.max(uptimeDowntimeLastDay.downtime, 1) / 60).toFixed(2),
+                downtime_last_week: (Math.max(uptimeDowntimeLastWeek.downtime, 1) / 60).toFixed(2),
             });
+        
         }
 
         console.log("Generating CSV report...");
         const csv = await parseAsync(reportData);
-        const filePath = path.join(__dirname, `${report_id}.csv`);
+        const filePath = path.join(`${__dirname}/../reports`, `${report_id}.csv`);
         fs.writeFileSync(filePath, csv);
         await Report.findOneAndUpdate({ report_id }, { status: "Complete", file_path: filePath });
 
