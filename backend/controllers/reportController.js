@@ -33,7 +33,7 @@ const generateReportData = async (report_id) => {
         
 
         console.log("Fetching distinct store IDs from database...");
-        const stores = await StoreStatus.aggregate([{ $group: { _id: "$store_id" } }]);
+        const stores = await StoreStatus.aggregate([{ $group: { _id: "$store_id" } }, {$limit: 10}]);
 
         // Fetch all timezone data
         const timezoneData = await Timezone.find().lean();
