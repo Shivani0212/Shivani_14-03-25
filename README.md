@@ -6,7 +6,6 @@ This project provides backend APIs to monitor the uptime and downtime of restaur
 
 ## Tech Stack
 
-- **Frontend:** React.js
 - **Backend:** Node.js, Express.js
 - **Database:** MongoDB
 - **Additional Tools:** Mongoose, CSV Parser, Moment.js (for time handling)
@@ -87,18 +86,18 @@ The generated report includes:
 ## Installation
 
 1. Clone the repository:
-   \`\`\`sh
+   \`\`\`
    git clone https://github.com/your-username/store-monitoring-system.git
    cd store-monitoring-system
    \`\`\`
 2. Install dependencies:
-   \`\`\`sh
+   \`\`\`
    npm install
    \`\`\`
 3. Set up MongoDB and load CSV data.
 
 4. Start the server:
-   \`\`\`sh
+   \`\`\`
    npm run server
    \`\`\`
 
