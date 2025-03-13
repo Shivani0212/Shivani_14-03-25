@@ -33,7 +33,7 @@ const generateReportData = async (report_id) => {
         
 
         console.log("Fetching distinct store IDs from database...");
-        const stores = await StoreStatus.aggregate([{ $group: { _id: "$store_id" } },{$limit:1}]);
+        const stores = await StoreStatus.aggregate([{ $group: { _id: "$store_id" } }]);
 
         // Fetch all timezone data
         const timezoneData = await Timezone.find().lean();
@@ -65,7 +65,7 @@ const generateReportData = async (report_id) => {
             console.log(`Timezone : ${timezone}`);
 
             // Get store business hours (default to 24/7)
-            const businessHours = businessHoursMap.get(store_id) || getDefaultBusinessHours();
+            let businessHours = businessHoursMap.get(store_id) || getDefaultBusinessHours();
 
             // Fetch all entries for the store
             const statuses = await StoreStatus.find({ store_id: store_id }).lean();
@@ -85,14 +85,31 @@ const generateReportData = async (report_id) => {
                 for (const status of filteredStatuses) {
                     const timestamp = status.timestamp_utc.clone().tz(timezone);
 
-                    // TODO - Ignore if outside business hours
-                    // if (!isWithinBusinessHours(timestamp,businessHours)) continue; 
+                    const dayOfWeek = timestamp.isoWeekday() - 1; // Convert to 0=Monday, 6=Sunday
+                    let menuHours = businessHours.filter(m => m.day_of_week === dayOfWeek);
+                    if (menuHours.length === 0) {
+                        menuHours = [{ start_time_local: "00:00:00", end_time_local: "23:59:59" }];
+                    }
 
-                    if (prevTimestamp) {
-                        const diffMinutes = timestamp.diff(prevTimestamp, "minutes");
-
-                        if (prevStatus === "active") uptime += diffMinutes;
-                        else downtime += diffMinutes;
+                    for (let hours of menuHours) {
+                        let startTime = moment.tz(
+                            timestamp.format("YYYY-MM-DD") + " " + hours.start_time_local,
+                            timezone
+                        );
+                        let endTime = moment.tz(
+                            timestamp.format("YYYY-MM-DD") + " " + hours.end_time_local,
+                            timezone
+                        );
+                        let isWithinOperatingHours = timestamp.isBetween(startTime, endTime, null, "[]");
+    
+                        if (isWithinOperatingHours) {
+                            if (prevTimestamp) {
+                                const diffMinutes = timestamp.diff(prevTimestamp, "minutes");
+        
+                                if (prevStatus === "active") uptime += diffMinutes;
+                                else downtime += diffMinutes;
+                            }
+                        }
                     }
 
                     prevTimestamp = timestamp;
