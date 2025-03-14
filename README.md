@@ -88,3 +88,11 @@ The generated report includes:
 5. Start the server:
    `npm run dev`
 
+
+## Improvements
+
+1. **Optimize Database Queries**  
+   - Use MongoDB indexing on `store_id` and `timestamp_utc` to improve query performance for status retrieval.
+
+2. **Error Handling and Logging**  
+   - Integrate a centralized logging system (e.g., Winston or Morgan) to log API requests, errors, and report generation progress for better debugging.
