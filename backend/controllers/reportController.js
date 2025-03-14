@@ -199,56 +199,7 @@ const triggerReport = async (req, res) => {
     }
 };
 
-
-// **Aggregate Report Data from CSV Files**
-const getAggregatedReport = async (req, res) => {
-    try {
-        if (!fs.existsSync(reportsDir)) {
-            return res.status(404).json({ error: "No reports found" });
-        }
-
-        let aggregatedData = {};
-
-        fs.readdirSync(reportsDir).forEach((file) => {
-            if (file.endsWith(".csv")) {
-                const filePath = path.join(reportsDir, file);
-                const fileData = fs.readFileSync(filePath, "utf8");
-
-                fileData
-                    .split("\n")
-                    .slice(1)
-                    .forEach((line) => {
-                        const [store_id, uptime_last_hour, uptime_last_day, uptime_last_week, downtime_last_hour, downtime_last_day, downtime_last_week] = line.split(",");
-
-                        if (!store_id) return;
-
-                        if (!aggregatedData[store_id]) {
-                            aggregatedData[store_id] = {
-                                uptime_last_hour: 0,
-                                uptime_last_day: 0,
-                                uptime_last_week: 0,
-                                downtime_last_hour: 0,
-                                downtime_last_day: 0,
-                                downtime_last_week: 0,
-                            };
-                        }
-
-                        aggregatedData[store_id].uptime_last_hour += parseFloat(uptime_last_hour);
-                        aggregatedData[store_id].uptime_last_day += parseFloat(uptime_last_day);
-                        aggregatedData[store_id].uptime_last_week += parseFloat(uptime_last_week);
-                        aggregatedData[store_id].downtime_last_hour += parseFloat(downtime_last_hour);
-                        aggregatedData[store_id].downtime_last_day += parseFloat(downtime_last_day);
-                        aggregatedData[store_id].downtime_last_week += parseFloat(downtime_last_week);
-                    });
-            }
-        });
-
-        res.json(aggregatedData);
-    } catch (error) {
-        console.error("Error aggregating report:", error);
-        res.status(500).json({ error: "Internal Server Error" });
-    }
-};
+    
 
 // **Check Report Status & Return CSV**
 const getReport = async (req, res) => {
@@ -268,4 +219,4 @@ const getReport = async (req, res) => {
     }
 };
 
-module.exports={triggerReport, getReport, getAggregatedReport};
+module.exports={triggerReport, getReport};
