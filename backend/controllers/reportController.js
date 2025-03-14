@@ -164,15 +164,6 @@ const generateReportData = async (report_id) => {
 };
 
 /**
- * Helper function to update uptime or downtime.
- */
-function updateUptimeDowntime(obj, timestamp, diffMinutes, timeRanges) {
-    if (timestamp.isAfter(timeRanges.lastHour)) obj.lastHour += diffMinutes;
-    if (timestamp.isAfter(timeRanges.lastDay)) obj.lastDay += diffMinutes;
-    obj.lastWeek += diffMinutes;
-}
-
-/**
  * Returns default business hours (24/7).
  */
 function getDefaultBusinessHours() {
