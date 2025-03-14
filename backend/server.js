@@ -2,7 +2,7 @@ const express = require("express");
 const mongoose = require("mongoose");
 const dotenv = require("dotenv");
 //const router = require("./routes/reportRoutes");
-const { triggerReport, getAggregatedReport, getReport } = require("./controllers/reportController");
+const { triggerReport, getReport } = require("./controllers/reportController");
 dotenv.config();
 const app = express();
 app.use(express.json());
